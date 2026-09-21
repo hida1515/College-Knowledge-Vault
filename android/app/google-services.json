@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "301553059515",
+    "project_id": "college-knowledge-valut",
+    "storage_bucket": "college-knowledge-valut.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:301553059515:android:11f15bc3bb87e2513b8b9e",
+        "android_client_info": {
+          "package_name": "com.collegekv.vault"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "301553059515-t8f6gs1bcbjm4e8hf3bteva0u42f2l9v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.collegekv.vault",
+            "certificate_hash": "44e947e498d8e3d5fdab1c4a5e81d8f650fee17b"
+          }
+        },
+        {
+          "client_id": "301553059515-ecl1psl380em9dtut0gmv09h1gdk1r99.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8Nslq8KWCp50XSVttIMBUQZzJ20nWIVk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "301553059515-ecl1psl380em9dtut0gmv09h1gdk1r99.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
