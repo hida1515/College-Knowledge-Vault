@@ -114,8 +114,9 @@ export const EntryCard: React.FC<EntryCardProps> = ({
   }
   const authorSubtitle = authorSubtitleParts.join(' · ');
 
+  const entryTypeStr = entry.type || EntryType.Project;
   const capitalizedType =
-    entry.type.charAt(0).toUpperCase() + entry.type.slice(1).toLowerCase();
+    entryTypeStr.charAt(0).toUpperCase() + entryTypeStr.slice(1).toLowerCase();
 
   return (
     <TouchableOpacity
@@ -134,9 +135,9 @@ export const EntryCard: React.FC<EntryCardProps> = ({
             ]}
           >
             <Text style={[styles.typeBadgeText, { color: typeConfig.text }]}>
-              {entry.type.toUpperCase()}
+              {entryTypeStr.toUpperCase()}
             </Text>
-            <Text style={{ opacity: 0, fontSize: 0, height: 0, width: 0, position: 'absolute' }}>
+            <Text style={{ opacity: 0, fontSize: 1, height: 0, width: 0, position: 'absolute' }}>
               {capitalizedType}
             </Text>
           </View>
@@ -213,7 +214,7 @@ export const EntryCard: React.FC<EntryCardProps> = ({
             >
               {upvoteCount}
             </Text>
-            <Text style={{ opacity: 0, fontSize: 0, height: 0, width: 0, position: 'absolute' }}>
+            <Text style={{ opacity: 0, fontSize: 1, height: 0, width: 0, position: 'absolute' }}>
               {isUpvoted ? Math.max(0, upvoteCount - 1) : upvoteCount + 1}
             </Text>
           </TouchableOpacity>

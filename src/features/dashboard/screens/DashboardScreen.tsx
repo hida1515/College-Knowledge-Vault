@@ -201,10 +201,14 @@ const DashboardScreen: React.FC = () => {
                   entry={entry}
                   showStatusBadge
                   onPress={() => {
-                    navigation.navigate('HomeTab', {
-                      screen: 'EntryDetail',
-                      params: { entryId: entry.id },
-                    });
+                    try {
+                      navigation.navigate('EntryDetail', { entryId: entry.id });
+                    } catch {
+                      (navigation.getParent() || navigation).navigate('HomeTab', {
+                        screen: 'EntryDetail',
+                        params: { entryId: entry.id },
+                      });
+                    }
                   }}
                 />
                 {entry.status === 'rejected' && (

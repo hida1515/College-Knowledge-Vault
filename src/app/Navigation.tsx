@@ -160,7 +160,9 @@ function ProfileStackScreen() {
         headerShown: false,
       }}>
       <ProfileStack.Screen name="Profile" component={ProfileScreen} />
+      <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
       <ProfileStack.Screen name="Dashboard" component={DashboardScreen} />
+      <ProfileStack.Screen name="EntryDetail" component={EntryDetailScreen} />
       <ProfileStack.Screen name="ModerationQueue" component={FacultyModerationScreen} />
       <ProfileStack.Screen name="Bookmarks" component={BookmarksScreen} />
       <ProfileStack.Screen name="AdminHome" component={AdminHomeScreen} />

@@ -145,7 +145,7 @@ const SeniorProfileSections: React.FC<SeniorProfileSectionsProps> = ({
                 <View key={item.id} style={styles.submissionItemCard}>
                   <View style={styles.submissionItemTop}>
                     <View style={styles.submissionTypeBadge}>
-                      <Text style={styles.submissionTypeText}>{item.type.toUpperCase()}</Text>
+                      <Text style={styles.submissionTypeText}>{(item.type || 'PROJECT').toUpperCase()}</Text>
                     </View>
                     <View
                       style={[
@@ -183,7 +183,7 @@ const SeniorProfileSections: React.FC<SeniorProfileSectionsProps> = ({
                   <View style={styles.submissionItemMeta}>
                     {item.subject ? <Text style={styles.submissionItemSubject}>{item.subject}</Text> : null}
                     {item.semester ? <Text style={styles.submissionItemSem}> · Sem {item.semester}</Text> : null}
-                    <Text style={styles.submissionItemDate}> · {new Date(item.createdAt).toLocaleDateString()}</Text>
+                    <Text style={styles.submissionItemDate}> · {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</Text>
                   </View>
 
                   {!isApproved && !isRejected && (

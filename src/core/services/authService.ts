@@ -341,7 +341,6 @@ export async function completeRoleSelection(
     department: payload.department,
     joining_year: payload.joiningYear ?? null,
     program: payload.program ?? null,
-    program_type: payload.programType ?? null,
     program_duration: payload.programDuration ?? null,
     graduation_year: graduationYear,
   };
@@ -375,6 +374,9 @@ export async function completeRoleSelection(
         college: payload.college,
         college_id: payload.collegeId ?? null,
         department: payload.department,
+        joining_year: payload.joiningYear ?? null,
+        program: payload.program ?? null,
+        program_duration: payload.programDuration ?? null,
         graduation_year: graduationYear,
       };
       if (payload.joinedViaCode) {

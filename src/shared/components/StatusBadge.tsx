@@ -37,7 +37,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   return (
     <View style={[styles.badge, { backgroundColor }]}>
       <Text style={[styles.text, { color: textColor }]}>{label.toUpperCase()}</Text>
-      <Text style={{ opacity: 0, fontSize: 0, height: 0, width: 0, position: 'absolute' }}>{label}</Text>
+      <Text style={{ opacity: 0, fontSize: 1, height: 0, width: 0, position: 'absolute' }}>{label}</Text>
     </View>
   );
 };

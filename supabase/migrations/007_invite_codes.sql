@@ -51,31 +51,32 @@ DROP POLICY IF EXISTS "entries_select_verified_college" ON public.entries;
 CREATE POLICY "entries_select_verified_college" ON public.entries
   FOR SELECT TO authenticated
   USING (
-    -- Super Admin sees all entries
-    EXISTS (
-      SELECT 1 FROM public.users
-      WHERE id = auth.uid() AND is_super_admin = true
-    )
-    OR
-    -- Verified users (joined via code) see approved entries for their college
-    (
-      college_id = (
-        SELECT college_id FROM public.users
-        WHERE id = auth.uid()
-        AND joined_via_code IS NOT NULL
+    is_deleted = false
+    AND (
+      -- Super Admin sees all entries
+      EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = auth.uid() AND is_super_admin = true
       )
-      AND (
-        (status = 'approved' AND is_deleted = false)
-        OR author_id = auth.uid()
-        OR EXISTS (
-          SELECT 1 FROM public.users u
-          WHERE u.id = auth.uid()
-          AND u.college_id = entries.college_id
-          AND (
-            u.is_college_admin = true
-            OR (u.role = 'faculty' AND u.is_verified = true)
-          )
+      -- Authors ALWAYS see their own entries (any status)
+      OR author_id = auth.uid()
+      -- Approved entries visible to same-college users
+      OR (
+        status = 'approved'
+        AND (
+          college_id IS NULL
+          OR college_id = (SELECT college_id FROM public.users WHERE id = auth.uid())
         )
+      )
+      -- College Admin / Faculty see all entries in their college
+      OR EXISTS (
+        SELECT 1 FROM public.users u
+        WHERE u.id = auth.uid()
+        AND (
+          u.is_college_admin = true
+          OR (u.role = 'faculty' AND u.is_verified = true)
+        )
+        AND (u.college_id = entries.college_id OR u.college_id IS NULL OR entries.college_id IS NULL)
       )
     )
   );

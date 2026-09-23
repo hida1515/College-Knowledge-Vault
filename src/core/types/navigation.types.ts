@@ -70,7 +70,9 @@ export type SubmitStackParamList = {
 
 export type ProfileStackParamList = {
   Profile: undefined;
+  EditProfile: undefined;
   Dashboard: undefined;
+  EntryDetail: { entryId: string };
   ModerationQueue: undefined;
   AdminHome: undefined;
   ModerationDetail: { recordId: string };
