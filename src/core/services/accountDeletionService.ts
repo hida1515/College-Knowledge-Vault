@@ -10,6 +10,7 @@
 import { supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
 import { clearSupabaseSession } from './mmkvStorage';
+import { signOut } from './authService';
 
 export async function deleteUserAccount(userId: string): Promise<void> {
   if (!userId) {
@@ -42,6 +43,11 @@ export async function deleteUserAccount(userId: string): Promise<void> {
           display_name: 'Deleted User',
           avatar_url: null,
           fcm_token: null,
+          college: '',
+          college_id: null,
+          department: '',
+          graduation_year: null,
+          role: 'student',
         })
         .eq('id', userId);
     } catch {
@@ -49,7 +55,11 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     }
   }
 
-  // 2. Clear local storage & auth state
+  // 2. Clear Google session, Supabase auth session, MMKV storage & local state
+  try {
+    await signOut();
+  } catch {}
+
   try {
     clearSupabaseSession();
   } catch {}

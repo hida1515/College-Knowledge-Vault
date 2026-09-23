@@ -76,8 +76,14 @@ export async function signInWithGoogle(): Promise<{
   let dbUser = data as DbUser | null;
   const isSuperAdminEmail = authData.session.user.email?.toLowerCase() === 'hidagafoor05@gmail.com';
 
-  if (!dbUser) {
-    // Self-healing fallback: insert user profile into public.users if trigger didn't fire
+  const isDeletedUser = Boolean(
+    dbUser &&
+      (dbUser.display_name === 'Deleted User' ||
+        dbUser.email?.startsWith('deleted-'))
+  );
+
+  if (!dbUser || isDeletedUser) {
+    // Self-healing fallback: insert/reset user profile if trigger didn't fire or account was deleted
     const newProfile = {
       id: authData.session.user.id,
       email: authData.session.user.email ?? '',
@@ -89,6 +95,28 @@ export async function signInWithGoogle(): Promise<{
       avatar_url: authData.session.user.user_metadata?.avatar_url ?? null,
       role: 'student' as const,
       is_super_admin: isSuperAdminEmail,
+      college: '',
+      college_id: null,
+      department: '',
+      graduation_year: null,
+      joining_year: null,
+      program: null,
+      program_type: null,
+      program_duration: 4,
+      is_verified: false,
+      is_college_admin: false,
+      is_senior_revoked: false,
+      faculty_verified_by: null,
+      faculty_verified_at: null,
+      college_admin_verified_by: null,
+      college_admin_verified_at: null,
+      pending_role_request: null,
+      joined_via_code: null,
+      code_type: null,
+      rejection_reason: null,
+      fcm_token: null,
+      entry_count: 0,
+      total_upvotes_received: 0,
     };
     await supabase.from('users').upsert(newProfile);
     const { data: refetched } = await supabase
@@ -198,7 +226,12 @@ export async function getCurrentUser(): Promise<User | null> {
 
   const dbUser = data as DbUser | null;
 
-  if (error || !dbUser) {
+  if (
+    error ||
+    !dbUser ||
+    dbUser.display_name === 'Deleted User' ||
+    dbUser.email?.startsWith('deleted-')
+  ) {
     return null;
   }
 
@@ -384,7 +417,12 @@ export async function restoreSession(): Promise<{
 
   const dbUser = data as DbUser | null;
 
-  if (userError || !dbUser) {
+  if (
+    userError ||
+    !dbUser ||
+    dbUser.display_name === 'Deleted User' ||
+    dbUser.email?.startsWith('deleted-')
+  ) {
     return null;
   }
 

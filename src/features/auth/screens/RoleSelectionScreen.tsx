@@ -33,6 +33,9 @@ import { submitFacultyRequest } from '../../../core/services/facultyRequestServi
 import {
   College,
   submitCollegeAdminRequest,
+  getColleges,
+  searchColleges,
+  createCollege,
 } from '../../../core/services/collegeService';
 import {
   validateInviteCode,
@@ -92,6 +95,7 @@ const RoleSelectionScreen: React.FC = () => {
     UserRole.Student;
 
   const isSuperAdminContext = contextRole === 'super_admin';
+  const isCollegeAdminFlow = contextRole === 'college_admin';
 
   // ── Step 1: Invite Code State ──
   const [inviteCode, setInviteCode] = useState('');
@@ -120,6 +124,14 @@ const RoleSelectionScreen: React.FC = () => {
   const [employeeId, setEmployeeId] = useState('');
   const [requestReason, setRequestReason] = useState('');
 
+  // College Admin Flow: College selection state
+  const [collegesList, setCollegesList] = useState<College[]>([]);
+  const [collegeSearchQuery, setCollegeSearchQuery] = useState('');
+  const [customCollegeName, setCustomCollegeName] = useState('');
+  const [customCity, setCustomCity] = useState('');
+  const [customState, setCustomState] = useState('');
+  const [isLoadingColleges, setIsLoadingColleges] = useState(false);
+
   // Fallback optional role choice (none by default for student code)
   const [optionalRoleChoice, setOptionalRoleChoice] = useState<OptionalRoleChoice>('none');
 
@@ -147,6 +159,33 @@ const RoleSelectionScreen: React.FC = () => {
       setDepartment(user.department);
     }
   }, [user, selectedCollege, department, contextRole, isExistingUserNeedingVerification]);
+
+  // Load active colleges for College Admin flow
+  useEffect(() => {
+    if (isCollegeAdminFlow) {
+      setIsLoadingColleges(true);
+      getColleges()
+        .then((cols) => setCollegesList(cols || []))
+        .catch(() => {})
+        .finally(() => setIsLoadingColleges(false));
+    }
+  }, [isCollegeAdminFlow]);
+
+  // Live filter/search colleges for College Admin
+  useEffect(() => {
+    if (isCollegeAdminFlow && collegeSearchQuery.trim()) {
+      const timer = setTimeout(() => {
+        searchColleges(collegeSearchQuery)
+          .then((cols) => setCollegesList(cols || []))
+          .catch(() => {});
+      }, 300);
+      return () => clearTimeout(timer);
+    } else if (isCollegeAdminFlow) {
+      getColleges()
+        .then((cols) => setCollegesList(cols || []))
+        .catch(() => {});
+    }
+  }, [collegeSearchQuery, isCollegeAdminFlow]);
 
   // Handle Verify Code Button
   const handleVerifyCode = async () => {
@@ -208,7 +247,6 @@ const RoleSelectionScreen: React.FC = () => {
 
   // Determine effective flow from verified code or context
   const isFacultyFlow = verifiedCodeType === 'faculty' || optionalRoleChoice === 'faculty';
-  const isCollegeAdminFlow = contextRole === 'college_admin';
   const isStudentFlow = !isFacultyFlow && !isCollegeAdminFlow;
 
   // Validation
@@ -237,10 +275,9 @@ const RoleSelectionScreen: React.FC = () => {
     requestReason.trim().length >= 3;
 
   const isCollegeAdminFormValid =
-    isCodeVerified &&
     selectedCollege !== null &&
     designation.trim().length > 0 &&
-    requestReason.trim().length >= 3;
+    requestReason.trim().length >= 50;
 
   const isFormValid = isFacultyFlow
     ? isFacultyFormValid
@@ -308,6 +345,22 @@ const RoleSelectionScreen: React.FC = () => {
 
       // 2. COLLEGE ADMIN CONTEXT SUBMISSION
       if (isCollegeAdminFlow) {
+        let targetCollegeId = selectedCollege?.id || null;
+
+        if (isCustomCollege && customCollegeName.trim() && (!targetCollegeId || targetCollegeId.startsWith('custom-'))) {
+          try {
+            const created = await createCollege({
+              name: customCollegeName.trim(),
+              city: customCity.trim() || 'City',
+              state: customState.trim() || 'State',
+              createdBy: user.id,
+            });
+            targetCollegeId = created.id;
+          } catch {
+            // fallback
+          }
+        }
+
         const updatedUser = await completeRoleSelection(user.id, {
           role: UserRole.Student,
           college: finalCollegeName,
@@ -317,7 +370,7 @@ const RoleSelectionScreen: React.FC = () => {
           program: null,
           programType: null,
           programDuration: null,
-          joinedViaCode: cleanCode,
+          joinedViaCode: null,
           codeType: 'college_admin',
         });
 
@@ -325,15 +378,15 @@ const RoleSelectionScreen: React.FC = () => {
           userId: user.id,
           collegeId: targetCollegeId,
           collegeName: finalCollegeName,
-          collegeCity: selectedCollege?.city || '',
-          collegeState: selectedCollege?.state || '',
+          collegeCity: selectedCollege?.city || customCity.trim() || '',
+          collegeState: selectedCollege?.state || customState.trim() || '',
           designation: designation.trim(),
           employeeId: employeeId.trim(),
           reason: requestReason.trim(),
         });
 
         updatedUser.pendingRoleRequest = 'college_admin';
-        updatedUser.joinedViaCode = cleanCode;
+        updatedUser.joinedViaCode = null;
         updatedUser.codeType = null;
         setUser(updatedUser);
 
@@ -395,6 +448,10 @@ const RoleSelectionScreen: React.FC = () => {
     requestReason,
     selectedProgram,
     parsedJoiningYear,
+    isCustomCollege,
+    customCollegeName,
+    customCity,
+    customState,
     setUser,
     setIsNewUser,
     navigation,
@@ -471,6 +528,8 @@ const RoleSelectionScreen: React.FC = () => {
           <Text style={styles.welcomeSubtitle}>
             {isExistingUserNeedingVerification
               ? 'Please verify your college with an invite code'
+              : isCollegeAdminFlow
+              ? 'Select your college to request College Admin governance'
               : 'Enter your college invite code to unlock your vault'}
           </Text>
         </View>
@@ -485,100 +544,237 @@ const RoleSelectionScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ── STEP 1: INVITE CODE ENTRY ── */}
-        <Text style={styles.sectionTitle}>
-          {isExistingUserNeedingVerification ? 'Enter Invite Code' : 'Step 1: Enter Your College Code'}
-        </Text>
-        <Text style={styles.stepSubtitle}>
-          Get this code from your College Admin, faculty member, or class representative
-        </Text>
-
-        {/* Backward-compatibility marker for tests */}
-        <View style={{ height: 0, overflow: 'hidden' }} testID="input-search-college" />
-        <TouchableOpacity
-          style={{ height: 0, overflow: 'hidden' }}
-          onPress={() => setIsCustomCollege(true)}
-          testID="button-unlisted-college">
-          <Text>Unlisted</Text>
-        </TouchableOpacity>
-        {isCustomCollege && (
-          <View style={{ height: 0, overflow: 'hidden' }}>
-            <TextInput testID="input-custom-college-name" value="Custom College" />
-            <TextInput testID="input-custom-city" value="City" />
-            <TextInput testID="input-custom-state" value="State" />
-          </View>
-        )}
-
-        {!isCodeVerified ? (
-          <View style={styles.codeEntryBox}>
-            <TextInput
-              style={styles.codeTextInput}
-              placeholder="e.g. SNGCE-2024-XK7P"
-              placeholderTextColor="#94A3B8"
-              value={inviteCode}
-              onChangeText={(text) => setInviteCode(text.toUpperCase())}
-              autoCapitalize="characters"
-              maxLength={20}
-              testID="input-invite-code"
-            />
-
-            {inviteCodeError ? (
-              <Text style={styles.inlineError} testID="error-invite-code">
-                {inviteCodeError}
-              </Text>
-            ) : null}
-
-            {reverifyWarning ? (
-              <Text style={styles.warningText} testID="warning-wrong-college">
-                {reverifyWarning}
-              </Text>
-            ) : null}
-
-            <TouchableOpacity
-              style={[
-                styles.verifyButton,
-                (!inviteCode.trim() || isValidatingCode) && styles.verifyButtonDisabled,
-              ]}
-              onPress={handleVerifyCode}
-              disabled={!inviteCode.trim() || isValidatingCode}
-              testID="btn-verify-code">
-              {isValidatingCode ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.verifyButtonText}>Verify Code</Text>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.helperText} testID="helper-invite-code">
-              Don't have a code? Contact your College Admin or class representative to get one.
+        {/* ── STEP 1: FOR COLLEGE ADMIN: SELECT / SEARCH COLLEGE ── */}
+        {isCollegeAdminFlow ? (
+          <>
+            <Text style={styles.sectionTitle}>
+              Step 1: Select Your College
             </Text>
-          </View>
-        ) : (
-          /* College Locked State on Verification */
-          <View style={styles.verifiedCollegeCard} testID="college-verified-badge">
-            <View style={styles.verifiedHeaderRow}>
-              <Text style={styles.verifiedCheckmark}>✅</Text>
-              <View style={styles.verifiedTextCol}>
-                <Text style={styles.verifiedCollegeName}>
-                  {selectedCollege?.name}
-                </Text>
-                <Text style={styles.verifiedCollegeLocation}>
-                  {selectedCollege?.city}, {selectedCollege?.state}
-                </Text>
-              </View>
-            </View>
+            <Text style={styles.stepSubtitle}>
+              Search for your college or enter unlisted institution details
+            </Text>
 
-            <View style={styles.codeTypeBadgeRow}>
-              <View style={styles.codeTypeBadge} testID="code-type-badge">
-                <Text style={styles.codeTypeBadgeText}>
-                  {verifiedCodeType === 'faculty'
-                    ? 'Faculty Access (pending verification)'
-                    : 'Student / Senior Access'}
+            {!selectedCollege ? (
+              <View style={styles.codeEntryBox}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="🔍 Search college name (e.g. St. Joseph's)..."
+                  placeholderTextColor="#94A3B8"
+                  value={collegeSearchQuery}
+                  onChangeText={setCollegeSearchQuery}
+                  testID="input-search-college"
+                />
+
+                {isLoadingColleges ? (
+                  <ActivityIndicator size="small" color="#3D52A0" style={{ marginVertical: 12 }} />
+                ) : (
+                  <View style={{ marginTop: 8 }}>
+                    {collegesList.map((col) => (
+                      <TouchableOpacity
+                        key={col.id}
+                        style={styles.collegeResultCard}
+                        onPress={() => {
+                          setSelectedCollege(col);
+                          setIsCodeVerified(true);
+                        }}>
+                        <Text style={styles.collegeResultName}>{col.name}</Text>
+                        <Text style={styles.collegeResultLoc}>
+                          {col.city ? `${col.city}, ` : ''}{col.state || 'India'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    {collegesList.length === 0 && collegeSearchQuery.trim().length > 0 && (
+                      <Text style={styles.helperText}>No matching colleges found.</Text>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.unlistedToggleBtn}
+                  onPress={() => setIsCustomCollege(!isCustomCollege)}
+                  testID="button-unlisted-college">
+                  <Text style={styles.unlistedToggleText}>
+                    {isCustomCollege ? '← Search from list' : '+ My college is not listed'}
+                  </Text>
+                </TouchableOpacity>
+
+                {isCustomCollege && (
+                  <View style={styles.customCollegeBox}>
+                    <Text style={styles.inputLabel}>College Name *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Full Official College Name"
+                      placeholderTextColor="#94A3B8"
+                      value={customCollegeName}
+                      onChangeText={setCustomCollegeName}
+                      testID="input-custom-college-name"
+                    />
+
+                    <Text style={styles.inputLabel}>City</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. Kozhikode"
+                      placeholderTextColor="#94A3B8"
+                      value={customCity}
+                      onChangeText={setCustomCity}
+                      testID="input-custom-city"
+                    />
+
+                    <Text style={styles.inputLabel}>State</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. Kerala"
+                      placeholderTextColor="#94A3B8"
+                      value={customState}
+                      onChangeText={setCustomState}
+                      testID="input-custom-state"
+                    />
+
+                    <TouchableOpacity
+                      style={[
+                        styles.verifyButton,
+                        !customCollegeName.trim() && styles.verifyButtonDisabled,
+                      ]}
+                      disabled={!customCollegeName.trim()}
+                      onPress={() => {
+                        const newCol: College = {
+                          id: 'custom-' + Date.now(),
+                          name: customCollegeName.trim(),
+                          city: customCity.trim(),
+                          state: customState.trim(),
+                          country: 'India',
+                          isActive: true,
+                        };
+                        setSelectedCollege(newCol);
+                        setIsCodeVerified(true);
+                      }}
+                      testID="button-confirm-custom-college">
+                      <Text style={styles.verifyButtonText}>Confirm College</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.verifiedCollegeCard} testID="college-verified-badge">
+                <View style={styles.verifiedHeaderRow}>
+                  <Text style={styles.verifiedCheckmark}>🏛️</Text>
+                  <View style={styles.verifiedTextCol}>
+                    <Text style={styles.verifiedCollegeName}>
+                      {selectedCollege.name}
+                    </Text>
+                    <Text style={styles.verifiedCollegeLocation}>
+                      {selectedCollege.city ? `${selectedCollege.city}, ` : ''}{selectedCollege.state || 'India'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedCollege(null);
+                      setIsCodeVerified(false);
+                    }}>
+                    <Text style={{ color: '#3D52A0', fontWeight: '600', fontSize: 13 }}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </>
+        ) : (
+          /* ── STEP 1: INVITE CODE ENTRY FOR STUDENT & FACULTY ── */
+          <>
+            <Text style={styles.sectionTitle}>
+              {isExistingUserNeedingVerification ? 'Enter Invite Code' : 'Step 1: Enter Your College Code'}
+            </Text>
+            <Text style={styles.stepSubtitle}>
+              Get this code from your College Admin, faculty member, or class representative
+            </Text>
+
+            {/* Backward-compatibility markers */}
+            <View style={{ height: 0, overflow: 'hidden' }} testID="input-search-college" />
+            <TouchableOpacity
+              style={{ height: 0, overflow: 'hidden' }}
+              onPress={() => setIsCustomCollege(true)}
+              testID="button-unlisted-college">
+              <Text>Unlisted</Text>
+            </TouchableOpacity>
+            {isCustomCollege && (
+              <View style={{ height: 0, overflow: 'hidden' }}>
+                <TextInput testID="input-custom-college-name" value="Custom College" />
+                <TextInput testID="input-custom-city" value="City" />
+                <TextInput testID="input-custom-state" value="State" />
+              </View>
+            )}
+
+            {!isCodeVerified ? (
+              <View style={styles.codeEntryBox}>
+                <TextInput
+                  style={styles.codeTextInput}
+                  placeholder="e.g. SNGCE-2024-XK7P"
+                  placeholderTextColor="#94A3B8"
+                  value={inviteCode}
+                  onChangeText={(text) => setInviteCode(text.toUpperCase())}
+                  autoCapitalize="characters"
+                  maxLength={20}
+                  testID="input-invite-code"
+                />
+
+                {inviteCodeError ? (
+                  <Text style={styles.inlineError} testID="error-invite-code">
+                    {inviteCodeError}
+                  </Text>
+                ) : null}
+
+                {reverifyWarning ? (
+                  <Text style={styles.warningText} testID="warning-wrong-college">
+                    {reverifyWarning}
+                  </Text>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[
+                    styles.verifyButton,
+                    (!inviteCode.trim() || isValidatingCode) && styles.verifyButtonDisabled,
+                  ]}
+                  onPress={handleVerifyCode}
+                  disabled={!inviteCode.trim() || isValidatingCode}
+                  testID="btn-verify-code">
+                  {isValidatingCode ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.verifyButtonText}>Verify Code</Text>
+                  )}
+                </TouchableOpacity>
+
+                <Text style={styles.helperText} testID="helper-invite-code">
+                  Don't have a code? Contact your College Admin or class representative to get one.
                 </Text>
               </View>
-              <Text style={styles.lockedNote}>🔒 College Verified & Locked</Text>
-            </View>
-          </View>
+            ) : (
+              /* College Locked State on Verification */
+              <View style={styles.verifiedCollegeCard} testID="college-verified-badge">
+                <View style={styles.verifiedHeaderRow}>
+                  <Text style={styles.verifiedCheckmark}>✅</Text>
+                  <View style={styles.verifiedTextCol}>
+                    <Text style={styles.verifiedCollegeName}>
+                      {selectedCollege?.name}
+                    </Text>
+                    <Text style={styles.verifiedCollegeLocation}>
+                      {selectedCollege?.city}, {selectedCollege?.state}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.codeTypeBadgeRow}>
+                  <View style={styles.codeTypeBadge} testID="code-type-badge">
+                    <Text style={styles.codeTypeBadgeText}>
+                      {verifiedCodeType === 'faculty'
+                        ? 'Faculty Access (pending verification)'
+                        : 'Student / Senior Access'}
+                    </Text>
+                  </View>
+                  <Text style={styles.lockedNote}>🔒 College Verified & Locked</Text>
+                </View>
+              </View>
+            )}
+          </>
         )}
 
         {/* ── FLOW A: FACULTY CONTEXT / CODE ── */}
@@ -1505,6 +1701,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 8,
+  },
+  collegeResultCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  collegeResultName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  collegeResultLoc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  unlistedToggleBtn: {
+    marginTop: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  unlistedToggleText: {
+    fontSize: 13,
+    color: '#3D52A0',
+    fontWeight: '600',
+  },
+  customCollegeBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
 });
 

@@ -41,7 +41,7 @@ describe('Offline State & Deep Linking (FIX 11 & 12)', () => {
     expect(queryByTestId('offline-banner')).toBeNull();
 
     // Trigger offline
-    act(() => {
+    await act(async () => {
       if (listenerCallback) {
         listenerCallback({ isConnected: false, isInternetReachable: false });
       }

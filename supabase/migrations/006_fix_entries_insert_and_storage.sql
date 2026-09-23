@@ -58,36 +58,13 @@ DROP POLICY IF EXISTS "entries_insert_same_college" ON public.entries;
 CREATE POLICY "entries_insert_same_college" ON public.entries
   FOR INSERT TO authenticated
   WITH CHECK (
-    -- Author must be the currently authenticated user
+    -- Author must be the currently authenticated user and not have privileges revoked
     author_id = auth.uid()
     AND (
       EXISTS (
         SELECT 1 FROM public.users u
         WHERE u.id = auth.uid()
-        AND (
-          -- 1. Super admin can insert any entry
-          u.is_super_admin = true
-          OR
-          -- 2. Verified faculty can insert
-          (u.role = 'faculty' AND u.is_verified = true)
-          OR
-          -- 3. College admin can insert (if college matches or entry unassigned)
-          (u.is_college_admin = true AND (entries.college_id IS NULL OR u.college_id = entries.college_id))
-          OR
-          -- 4. Senior by explicit role
-          (u.role = 'senior' AND u.is_senior_revoked = false)
-          OR
-          -- 5. Senior by graduation year (legacy)
-          (u.graduation_year IS NOT NULL AND u.graduation_year <= EXTRACT(YEAR FROM NOW())::int AND u.is_senior_revoked = false)
-          OR
-          -- 6. Senior by program duration (final year student)
-          (
-            u.joining_year IS NOT NULL
-            AND u.program_duration IS NOT NULL
-            AND (EXTRACT(YEAR FROM NOW())::int - u.joining_year + 1) >= u.program_duration
-            AND u.is_senior_revoked = false
-          )
-        )
+        AND u.is_senior_revoked = false
       )
     )
   );

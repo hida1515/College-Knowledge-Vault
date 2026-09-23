@@ -84,15 +84,18 @@ CREATE POLICY "entries_select"
     OR (public.get_user_role() = 'faculty')
   );
 
--- Only seniors and faculty can create entries
-CREATE POLICY "entries_insert"
-  ON public.entries FOR INSERT
-  TO authenticated
+DROP POLICY IF EXISTS "entries_insert" ON public.entries;
+DROP POLICY IF EXISTS "entries_insert_senior_faculty" ON public.entries;
+DROP POLICY IF EXISTS "entries_insert_same_college" ON public.entries;
+CREATE POLICY "entries_insert_same_college" ON public.entries FOR INSERT TO authenticated
   WITH CHECK (
     author_id = auth.uid()
     AND (
-      public.get_user_role() = 'senior'
-      OR public.get_user_role() = 'faculty'
+      EXISTS (
+        SELECT 1 FROM public.users u
+        WHERE u.id = auth.uid()
+        AND u.is_senior_revoked = false
+      )
     )
   );
 

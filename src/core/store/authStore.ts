@@ -164,6 +164,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Fetch fresh profile from DB on startup to capture background approvals
         const latestUser = await getCurrentUser();
         const activeUser = latestUser || restored.user;
+
+        if (
+          !activeUser ||
+          activeUser.displayName === 'Deleted User' ||
+          activeUser.email?.startsWith('deleted-')
+        ) {
+          clearSupabaseSession();
+          set({
+            session: null,
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          return;
+        }
+
         const isNewUser =
           !activeUser.isSuperAdmin &&
           (!activeUser.collegeId || !activeUser.college) &&
