@@ -509,6 +509,8 @@ export function RootNavigator() {
             options={{ gestureEnabled: isNewUser }}
           />
           <RootStack.Screen name="PendingAccess" component={PendingAccessScreen} />
+          <RootStack.Screen name="Landing" component={LandingScreen} />
+          <RootStack.Screen name="Login" component={LoginScreen} />
         </>
       ) : (
         <>

@@ -520,7 +520,14 @@ const RoleSelectionScreen: React.FC = () => {
             <TouchableOpacity
               testID="button-role-back"
               style={styles.backButton}
-              onPress={() => navigation.navigate('Landing')}>
+              onPress={async () => {
+                try {
+                  await signOut();
+                } catch {}
+                try {
+                  navigation.navigate('Landing');
+                } catch {}
+              }}>
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
           )}
