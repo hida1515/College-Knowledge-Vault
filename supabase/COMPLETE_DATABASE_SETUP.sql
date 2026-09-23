@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   graduation_year int,
   joining_year int,
   program text,
+  program_type text,
   program_duration int DEFAULT 4,
   is_verified boolean NOT NULL DEFAULT false,
   is_super_admin boolean NOT NULL DEFAULT false,
@@ -282,6 +283,9 @@ CREATE POLICY "colleges_update_admin" ON public.colleges FOR UPDATE TO authentic
 -- Users RLS
 DROP POLICY IF EXISTS "users_read_all" ON public.users;
 CREATE POLICY "users_read_all" ON public.users FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "users_insert_own" ON public.users;
+CREATE POLICY "users_insert_own" ON public.users FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
 
 DROP POLICY IF EXISTS "users_update_own" ON public.users;
 CREATE POLICY "users_update_own" ON public.users FOR UPDATE TO authenticated
@@ -514,4 +518,68 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.delete_user_account(uuid) TO authenticated;
+
+-- ============================================================
+-- 15. ENSURE USER PROFILE FUNCTION (Resilient Registration & Restore)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.ensure_user_profile()
+RETURNS public.users
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_user public.users;
+  v_email text;
+  v_name text;
+  v_avatar text;
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT email, raw_user_meta_data->>'full_name', raw_user_meta_data->>'avatar_url'
+  INTO v_email, v_name, v_avatar
+  FROM auth.users
+  WHERE id = v_uid;
+
+  INSERT INTO public.users (id, email, display_name, avatar_url, is_super_admin)
+  VALUES (
+    v_uid,
+    COALESCE(v_email, ''),
+    COALESCE(v_name, split_part(v_email, '@', 1), 'User'),
+    v_avatar,
+    (LOWER(COALESCE(v_email, '')) = 'hidagafoor05@gmail.com')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = CASE 
+      WHEN public.users.display_name = 'Deleted User' OR public.users.email LIKE 'deleted-%' THEN EXCLUDED.display_name 
+      ELSE public.users.display_name 
+    END,
+    college = CASE 
+      WHEN public.users.display_name = 'Deleted User' OR public.users.email LIKE 'deleted-%' THEN '' 
+      ELSE public.users.college 
+    END,
+    college_id = CASE 
+      WHEN public.users.display_name = 'Deleted User' OR public.users.email LIKE 'deleted-%' THEN NULL 
+      ELSE public.users.college_id 
+    END,
+    department = CASE 
+      WHEN public.users.display_name = 'Deleted User' OR public.users.email LIKE 'deleted-%' THEN '' 
+      ELSE public.users.department 
+    END,
+    role = CASE 
+      WHEN public.users.display_name = 'Deleted User' OR public.users.email LIKE 'deleted-%' THEN 'student'::user_role 
+      ELSE public.users.role 
+    END
+  RETURNING * INTO v_user;
+
+  RETURN v_user;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.ensure_user_profile() TO authenticated;
+
 

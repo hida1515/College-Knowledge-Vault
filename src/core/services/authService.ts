@@ -83,48 +83,80 @@ export async function signInWithGoogle(): Promise<{
   );
 
   if (!dbUser || isDeletedUser) {
-    // Self-healing fallback: insert/reset user profile if trigger didn't fire or account was deleted
-    const newProfile = {
-      id: authData.session.user.id,
-      email: authData.session.user.email ?? '',
-      display_name:
-        authData.session.user.user_metadata?.full_name ??
-        authData.session.user.user_metadata?.name ??
-        authData.session.user.email?.split('@')[0] ??
-        'User',
-      avatar_url: authData.session.user.user_metadata?.avatar_url ?? null,
-      role: 'student' as const,
-      is_super_admin: isSuperAdminEmail,
-      college: '',
-      college_id: null,
-      department: '',
-      graduation_year: null,
-      joining_year: null,
-      program: null,
-      program_type: null,
-      program_duration: 4,
-      is_verified: false,
-      is_college_admin: false,
-      is_senior_revoked: false,
-      faculty_verified_by: null,
-      faculty_verified_at: null,
-      college_admin_verified_by: null,
-      college_admin_verified_at: null,
-      pending_role_request: null,
-      joined_via_code: null,
-      code_type: null,
-      rejection_reason: null,
-      fcm_token: null,
-      entry_count: 0,
-      total_upvotes_received: 0,
-    };
-    await supabase.from('users').upsert(newProfile);
-    const { data: refetched } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', authData.session.user.id)
-      .maybeSingle();
-    dbUser = refetched as DbUser | null;
+    // 1. Try secure RPC first
+    try {
+      const { data: rpcUser, error: rpcErr } = await supabase.rpc('ensure_user_profile');
+      if (!rpcErr && rpcUser) {
+        dbUser = rpcUser as DbUser;
+      }
+    } catch {
+      // RPC may not exist yet, fallback to client upsert
+    }
+
+    // 2. Client-side upsert with verified baseline columns
+    if (!dbUser || isDeletedUser) {
+      const newProfile = {
+        id: authData.session.user.id,
+        email: authData.session.user.email ?? '',
+        display_name:
+          authData.session.user.user_metadata?.full_name ??
+          authData.session.user.user_metadata?.name ??
+          authData.session.user.email?.split('@')[0] ??
+          'User',
+        avatar_url: authData.session.user.user_metadata?.avatar_url ?? null,
+        role: 'student' as const,
+        is_super_admin: isSuperAdminEmail,
+        college: '',
+        college_id: null,
+        department: '',
+      };
+      await supabase.from('users').upsert(newProfile);
+      const { data: refetched } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.session.user.id)
+        .maybeSingle();
+      dbUser = refetched as DbUser | null;
+    }
+
+    // 3. Resilient synthesis fallback: if table insert was blocked by RLS, construct active profile
+    if (!dbUser) {
+      dbUser = {
+        id: authData.session.user.id,
+        email: authData.session.user.email ?? '',
+        display_name:
+          authData.session.user.user_metadata?.full_name ??
+          authData.session.user.user_metadata?.name ??
+          authData.session.user.email?.split('@')[0] ??
+          'User',
+        avatar_url: authData.session.user.user_metadata?.avatar_url ?? null,
+        role: 'student',
+        college: '',
+        college_id: null,
+        department: '',
+        graduation_year: null,
+        joining_year: null,
+        program: null,
+        program_type: null,
+        program_duration: 4,
+        is_verified: false,
+        is_super_admin: isSuperAdminEmail,
+        is_college_admin: false,
+        is_senior_revoked: false,
+        faculty_verified_by: null,
+        faculty_verified_at: null,
+        college_admin_verified_by: null,
+        college_admin_verified_at: null,
+        pending_role_request: null,
+        joined_via_code: null,
+        code_type: null,
+        fcm_token: null,
+        entry_count: 0,
+        total_upvotes_received: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
   } else if (!dbUser.is_super_admin && isSuperAdminEmail) {
     await supabase
       .from('users')
@@ -306,8 +338,7 @@ export async function completeRoleSelection(
 
   const { data, error } = await supabase
     .from('users')
-    .update(updateFields)
-    .eq('id', userId)
+    .upsert({ id: userId, ...updateFields })
     .select('*')
     .single();
 
@@ -334,8 +365,7 @@ export async function completeRoleSelection(
 
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('users')
-        .update(fallbackFields)
-        .eq('id', userId)
+        .upsert({ id: userId, ...fallbackFields })
         .select('*')
         .single();
 
