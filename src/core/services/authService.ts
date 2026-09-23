@@ -316,8 +316,25 @@ export async function completeRoleSelection(
       ? payload.joiningYear + payload.programDuration
       : null;
 
+  const currentUser = useAuthStore.getState().user;
+  const { data: { session } } = await supabase.auth.getSession();
+  const email = session?.user?.email || currentUser?.email || '';
+  const displayName =
+    session?.user?.user_metadata?.full_name ||
+    session?.user?.user_metadata?.name ||
+    currentUser?.displayName ||
+    session?.user?.email?.split('@')[0] ||
+    'User';
+  const avatarUrl =
+    session?.user?.user_metadata?.avatar_url ||
+    currentUser?.avatarUrl ||
+    null;
+
   // Try updating with full program and invite code fields
   const updateFields: Record<string, any> = {
+    email,
+    display_name: displayName,
+    avatar_url: avatarUrl,
     role: payload.role,
     college: payload.college,
     college_id: payload.collegeId ?? null,
@@ -347,9 +364,13 @@ export async function completeRoleSelection(
     if (
       error.message.includes('joining_year') ||
       error.message.includes('joined_via_code') ||
+      error.message.includes('program_type') ||
       error.message.includes('schema cache')
     ) {
       const fallbackFields: Record<string, any> = {
+        email,
+        display_name: displayName,
+        avatar_url: avatarUrl,
         role: payload.role,
         college: payload.college,
         college_id: payload.collegeId ?? null,
