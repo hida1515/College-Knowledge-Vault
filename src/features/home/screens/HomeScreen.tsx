@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
@@ -100,7 +101,14 @@ const HomeScreen: React.FC = () => {
       <View style={styles.container}>
         {/* Top Header */}
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Knowledge Vault</Text>
+          <View style={styles.headerTitleGroup}>
+            <Image
+              source={require('../../../assets/images/logo_icon.png')}
+              style={styles.headerLogoIcon}
+              resizeMode="contain"
+            />
+            <Text style={styles.headerTitle}>Knowledge Vault</Text>
+          </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.browseSubjectsBtn}
@@ -215,6 +223,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+  },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerLogoIcon: {
+    width: 28,
+    height: 28,
+    marginRight: 8,
   },
   headerTitle: {
     fontSize: 22,

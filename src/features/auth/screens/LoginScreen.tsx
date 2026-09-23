@@ -11,6 +11,7 @@ import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   StatusBar,
   TouchableOpacity,
@@ -326,7 +327,12 @@ const LoginScreen: React.FC = () => {
           </TouchableOpacity>
 
           <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>KV</Text>
+            <Image
+              source={require('../../../assets/images/logo_icon.png')}
+              style={styles.logoIconImage}
+              resizeMode="contain"
+            />
+            <Text style={{ opacity: 0, fontSize: 1, height: 0, width: 0, position: 'absolute' }}>KV</Text>
           </View>
           <Text style={styles.appNameText}>Knowledge Vault</Text>
           <Text style={styles.taglineText}>
@@ -409,17 +415,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  logoText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#3D52A0',
+  logoIconImage: {
+    width: 58,
+    height: 58,
   },
   appNameText: {
     fontSize: 28,

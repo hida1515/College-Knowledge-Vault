@@ -11,6 +11,7 @@ import React from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -87,7 +88,11 @@ export default function LandingScreen({ navigation }: Props) {
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>KV</Text>
+            <Image
+              source={require('../../../assets/images/logo_icon.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
           <Text style={styles.title}>{APP_NAME}</Text>
           <Text style={styles.subtitle}>
@@ -164,24 +169,22 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: colors.primary,
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: 1,
+  logoImage: {
+    width: 52,
+    height: 52,
   },
   title: {
     fontSize: 28,

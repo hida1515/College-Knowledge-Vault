@@ -11,6 +11,7 @@ import { supabase } from '../core/services/supabase';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ActivityIndicator,
   Alert,
@@ -88,7 +89,7 @@ import EditProfileScreen from '../features/profile/screens/EditProfileScreen';
 
 // Constants
 import { colors } from '../shared/constants/colors';
-import { NAV, APP_NAME } from '../core/constants/appConstants';
+import { NAV } from '../core/constants/appConstants';
 
 // ---------- Stack Navigators ----------
 
@@ -385,10 +386,13 @@ const tabStyles = StyleSheet.create({
 function SplashScreen() {
   return (
     <View style={splashStyles.container}>
-      <View style={splashStyles.logoIcon}>
-        <Text style={splashStyles.logoEmoji}>🎓</Text>
+      <View style={splashStyles.logoContainer}>
+        <Image
+          source={require('../assets/images/logo.png')}
+          style={splashStyles.logoFullImage}
+          resizeMode="contain"
+        />
       </View>
-      <Text style={splashStyles.appName}>{APP_NAME}</Text>
       <ActivityIndicator
         size="large"
         color={colors.primary}
@@ -405,26 +409,16 @@ const splashStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
   },
-  logoIcon: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    backgroundColor: `${colors.primary}12`,
+  logoContainer: {
+    width: 240,
+    height: 160,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: `${colors.primary}25`,
+    marginBottom: 20,
   },
-  logoEmoji: {
-    fontSize: 44,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -0.5,
-    marginBottom: 24,
+  logoFullImage: {
+    width: '100%',
+    height: '100%',
   },
   spinner: {
     marginTop: 8,
