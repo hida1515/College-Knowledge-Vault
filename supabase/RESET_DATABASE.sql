@@ -1,115 +1,131 @@
 -- ============================================================================
--- COLLEGE KNOWLEDGE VAULT — COMPLETE DATABASE RESET SCRIPT
+-- College Knowledge Vault — COMPLETE DATABASE RESET SCRIPT
 -- ============================================================================
--- Run this script in:
--- Supabase Dashboard -> SQL Editor -> New Query -> Paste & Run
 --
--- What this does:
--- 1. Wipes all user submissions (entries, viva questions, tags, attachments)
--- 2. Wipes all engagement data (upvotes, bookmarks, comments, flags, outdated marks)
--- 3. Wipes all verification & administrative requests (faculty, college admin)
--- 4. Wipes all college invite codes & usage records
--- 5. Wipes all registered user accounts from public.users and auth.users
--- 6. Wipes all uploaded media files from Supabase Storage buckets
--- 7. Re-seeds default predefined tags and starter college so the app is 100% ready
+-- PURPOSE:
+-- Clears all user profiles, auth accounts, colleges, entries (projects, viva,
+-- mistakes, resources), comments, upvotes, bookmarks, flags, requests, and
+-- uploaded PDF files from storage so you can start the application 100% fresh.
+--
+-- WHAT THIS PRESERVES:
+--  - All database tables, columns, constraints, and indexes
+--  - All enum types (user_role, entry_type, etc.)
+--  - All RLS policies and security definitions
+--  - All database functions & triggers (e.g., handle_new_user)
+--  - The predefined tags library (resetting usage counts to 0)
+--  - The 'project-reports' storage bucket configuration
+--
+-- HOW TO RUN:
+-- 1. Open your Supabase Dashboard: https://supabase.com/dashboard
+-- 2. Select your project -> Go to "SQL Editor" in the left sidebar
+-- 3. Click "+ New query", paste this entire script, and click "Run"
 -- ============================================================================
 
--- Step 1: Clear foreign key references that might block cascade
 DO $$
+DECLARE
+  tbl text;
+  extra_tables text[] := ARRAY[
+    'entry_comments',
+    'comments',
+    'bookmarks',
+    'upvotes',
+    'entry_upvotes',
+    'outdated_marks',
+    'entry_flags',
+    'flags',
+    'viva_questions',
+    'entry_tags',
+    'entries',
+    'faculty_requests',
+    'college_admin_requests',
+    'invite_code_uses',
+    'college_memberships',
+    'colleges',
+    'users'
+  ];
 BEGIN
-  UPDATE public.colleges SET created_by = NULL;
-  UPDATE public.users SET faculty_verified_by = NULL, college_admin_verified_by = NULL;
-  UPDATE public.entries SET approved_by = NULL;
-EXCEPTION WHEN OTHERS THEN NULL;
+  RAISE NOTICE 'Starting College Knowledge Vault Database Reset...';
+
+  -- 1. Disconnect foreign keys and circular references
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'colleges') THEN
+    EXECUTE 'UPDATE public.colleges SET created_by = NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
+    EXECUTE 'UPDATE public.users SET faculty_verified_by = NULL, college_admin_verified_by = NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'entries') THEN
+    EXECUTE 'UPDATE public.entries SET approved_by = NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'faculty_requests') THEN
+    EXECUTE 'UPDATE public.faculty_requests SET reviewed_by = NULL';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'college_admin_requests') THEN
+    EXECUTE 'UPDATE public.college_admin_requests SET reviewed_by = NULL';
+  END IF;
+
+  -- 2. Truncate all application data tables (CASCADE cleanly purges relations)
+  FOREACH tbl IN ARRAY extra_tables LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = tbl) THEN
+      EXECUTE format('TRUNCATE TABLE public.%I CASCADE', tbl);
+      RAISE NOTICE 'Cleared table: public.%', tbl;
+    END IF;
+  END LOOP;
+
+  -- 3. Clean up Tags: Remove custom tags and reset predefined tag usage counts to 0
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tags') THEN
+    DELETE FROM public.tags WHERE is_predefined = false;
+    UPDATE public.tags SET usage_count = 0;
+    
+    -- Ensure all standard predefined tags are present
+    INSERT INTO public.tags (name, is_predefined, usage_count) VALUES
+      ('Flutter', true, 0),
+      ('Dart', true, 0),
+      ('React Native', true, 0),
+      ('React', true, 0),
+      ('Node.js', true, 0),
+      ('Express', true, 0),
+      ('MongoDB', true, 0),
+      ('Firebase', true, 0),
+      ('Supabase', true, 0),
+      ('Python', true, 0),
+      ('Django', true, 0),
+      ('FastAPI', true, 0),
+      ('Java', true, 0),
+      ('Spring Boot', true, 0),
+      ('Kotlin', true, 0),
+      ('MySQL', true, 0),
+      ('PostgreSQL', true, 0),
+      ('TypeScript', true, 0),
+      ('JavaScript', true, 0),
+      ('AWS', true, 0),
+      ('Docker', true, 0),
+      ('Git', true, 0),
+      ('REST API', true, 0),
+      ('GraphQL', true, 0),
+      ('Machine Learning', true, 0)
+    ON CONFLICT (name) DO UPDATE SET usage_count = 0;
+
+    RAISE NOTICE 'Reset predefined tags library with 0 usage count';
+  END IF;
+
+  -- 4. Delete uploaded PDF files from Supabase Storage
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
+    DELETE FROM storage.objects WHERE bucket_id = 'project-reports';
+    RAISE NOTICE 'Purged all uploaded files from storage bucket: project-reports';
+  END IF;
+
+  -- 5. Delete all registered accounts from auth.users (Google logins, sessions, tokens)
+  -- This allows all accounts to re-register fresh as first-time users.
+  DELETE FROM auth.users;
+  RAISE NOTICE 'Purged all authentication accounts from auth.users';
+
+  RAISE NOTICE '=======================================================';
+  RAISE NOTICE 'College Knowledge Vault Database has been completely reset!';
+  RAISE NOTICE 'You can now launch the app with a clean slate.';
+  RAISE NOTICE '=======================================================';
+
 END $$;
-
--- Step 2: Truncate all application data tables
-TRUNCATE TABLE 
-  public.entry_comments,
-  public.bookmarks,
-  public.upvotes,
-  public.outdated_marks,
-  public.entry_flags,
-  public.entry_tags,
-  public.viva_questions,
-  public.entries,
-  public.faculty_requests,
-  public.college_admin_requests,
-  public.users,
-  public.colleges
-CASCADE;
-
--- Step 3: Clean up any legacy or auxiliary tables if they exist
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'entry_upvotes') THEN
-    TRUNCATE TABLE public.entry_upvotes CASCADE;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'moderation_queue') THEN
-    TRUNCATE TABLE public.moderation_queue CASCADE;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'flags') THEN
-    TRUNCATE TABLE public.flags CASCADE;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'comments') THEN
-    TRUNCATE TABLE public.comments CASCADE;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'invite_code_uses') THEN
-    TRUNCATE TABLE public.invite_code_uses CASCADE;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'college_memberships') THEN
-    TRUNCATE TABLE public.college_memberships CASCADE;
-  END IF;
-END $$;
-
--- Step 4: Delete all Supabase Auth records (resets all user logins, sessions, and tokens)
-DELETE FROM auth.users;
-
--- Step 5: Clean up all uploaded media files from Supabase Storage
-DELETE FROM storage.objects WHERE bucket_id IN ('entry-attachments', 'profile-avatars', 'attachments', 'avatars');
-
--- Step 6: Re-seed default predefined tags
-DELETE FROM public.tags WHERE is_predefined = false;
-INSERT INTO public.tags (name, is_predefined) VALUES
-  ('Flutter', true),
-  ('Dart', true),
-  ('React Native', true),
-  ('React', true),
-  ('Node.js', true),
-  ('Express', true),
-  ('MongoDB', true),
-  ('Firebase', true),
-  ('Supabase', true),
-  ('Python', true),
-  ('Django', true),
-  ('FastAPI', true),
-  ('Java', true),
-  ('Spring Boot', true),
-  ('Kotlin', true),
-  ('MySQL', true),
-  ('PostgreSQL', true),
-  ('TypeScript', true),
-  ('JavaScript', true),
-  ('Machine Learning', true),
-  ('Data Structures', true),
-  ('Algorithms', true),
-  ('Computer Networks', true),
-  ('Operating Systems', true),
-  ('DBMS', true),
-  ('Web Development', true),
-  ('Android', true),
-  ('iOS', true)
-ON CONFLICT (name) DO NOTHING;
-
--- Step 7: Re-seed default college so new users have a college to select/join
-INSERT INTO public.colleges (name, city, state, country, is_active) VALUES
-  ('Model Engineering College', 'Kochi', 'Kerala', 'India', true)
-ON CONFLICT (name, city) DO NOTHING;
-
--- Verification query (shows 0 for all cleared tables)
-SELECT 
-  (SELECT COUNT(*) FROM auth.users) AS auth_users_count,
-  (SELECT COUNT(*) FROM public.users) AS users_count,
-  (SELECT COUNT(*) FROM public.entries) AS entries_count,
-  (SELECT COUNT(*) FROM public.colleges) AS colleges_count,
-  (SELECT COUNT(*) FROM public.tags) AS tags_count;
