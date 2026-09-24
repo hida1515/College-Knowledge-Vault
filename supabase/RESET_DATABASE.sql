@@ -112,13 +112,7 @@ BEGIN
     RAISE NOTICE 'Reset predefined tags library with 0 usage count';
   END IF;
 
-  -- 4. Delete uploaded PDF files from Supabase Storage
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
-    DELETE FROM storage.objects WHERE bucket_id = 'project-reports';
-    RAISE NOTICE 'Purged all uploaded files from storage bucket: project-reports';
-  END IF;
-
-  -- 5. Delete all registered accounts from auth.users (Google logins, sessions, tokens)
+  -- 4. Delete all registered accounts from auth.users (Google logins, sessions, tokens)
   -- This allows all accounts to re-register fresh as first-time users.
   DELETE FROM auth.users;
   RAISE NOTICE 'Purged all authentication accounts from auth.users';
