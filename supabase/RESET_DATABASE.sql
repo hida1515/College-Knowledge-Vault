@@ -19,6 +19,7 @@
 DO $$
 DECLARE
   tbl text;
+  col text;
   dependent_tables text[] := ARRAY[
     'entry_comments',
     'comments',
@@ -36,6 +37,21 @@ DECLARE
     'invite_code_uses',
     'college_memberships'
   ];
+  user_opt_cols text[] := ARRAY[
+    'joining_year',
+    'program',
+    'program_duration',
+    'program_type',
+    'is_senior_revoked',
+    'is_college_admin',
+    'faculty_verified_by',
+    'faculty_verified_at',
+    'college_admin_verified_by',
+    'college_admin_verified_at',
+    'pending_role_request',
+    'joined_via_code',
+    'code_type'
+  ];
 BEGIN
   RAISE NOTICE 'Starting Soft Reset (Preserving Google Auth & User Accounts)...';
 
@@ -45,11 +61,15 @@ BEGIN
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
-    UPDATE public.users 
-    SET 
-      college_id = NULL,
-      faculty_verified_by = NULL,
-      college_admin_verified_by = NULL;
+    UPDATE public.users SET college_id = NULL;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'faculty_verified_by') THEN
+      UPDATE public.users SET faculty_verified_by = NULL;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'college_admin_verified_by') THEN
+      UPDATE public.users SET college_admin_verified_by = NULL;
+    END IF;
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'entries') THEN
@@ -106,8 +126,7 @@ BEGIN
     RAISE NOTICE 'Reset predefined tags library with 0 usage count';
   END IF;
 
-  -- 5. Reset all regular users' roles & college details in public.users
-  -- (Preserving their id, email, display_name, and avatar_url so Google Auth remains valid)
+  -- 5. Reset regular users in public.users (core columns)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
     UPDATE public.users
     SET
@@ -116,24 +135,25 @@ BEGIN
       college_id = NULL,
       department = '',
       graduation_year = NULL,
-      joining_year = NULL,
-      program = NULL,
-      program_type = NULL,
-      program_duration = 4,
       is_verified = false,
-      is_college_admin = false,
-      is_senior_revoked = false,
-      faculty_verified_by = NULL,
-      faculty_verified_at = NULL,
-      college_admin_verified_by = NULL,
-      college_admin_verified_at = NULL,
-      pending_role_request = NULL,
-      joined_via_code = NULL,
-      code_type = NULL,
       entry_count = 0,
       total_upvotes_received = 0,
       updated_at = now()
     WHERE is_super_admin = false AND LOWER(email) != 'hidagafoor05@gmail.com';
+
+    -- Safely clear any optional columns only if they exist in this schema
+    FOREACH col IN ARRAY user_opt_cols LOOP
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = col
+      ) THEN
+        IF col = 'is_senior_revoked' OR col = 'is_college_admin' THEN
+          EXECUTE format('UPDATE public.users SET %I = false WHERE is_super_admin = false AND LOWER(email) != ''hidagafoor05@gmail.com''', col);
+        ELSE
+          EXECUTE format('UPDATE public.users SET %I = NULL WHERE is_super_admin = false AND LOWER(email) != ''hidagafoor05@gmail.com''', col);
+        END IF;
+      END IF;
+    END LOOP;
 
     RAISE NOTICE 'Reset all regular users to unassigned state (Google sessions preserved)';
 
@@ -144,15 +164,23 @@ BEGIN
       is_verified = true,
       college = '',
       college_id = NULL,
-      faculty_verified_by = NULL,
-      faculty_verified_at = NULL,
-      college_admin_verified_by = NULL,
-      college_admin_verified_at = NULL,
-      pending_role_request = NULL,
       entry_count = 0,
       total_upvotes_received = 0,
       updated_at = now()
     WHERE is_super_admin = true OR LOWER(email) = 'hidagafoor05@gmail.com';
+
+    FOREACH col IN ARRAY user_opt_cols LOOP
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = col
+      ) THEN
+        IF col = 'is_senior_revoked' OR col = 'is_college_admin' THEN
+          EXECUTE format('UPDATE public.users SET %I = false WHERE is_super_admin = true OR LOWER(email) = ''hidagafoor05@gmail.com''', col);
+        ELSE
+          EXECUTE format('UPDATE public.users SET %I = NULL WHERE is_super_admin = true OR LOWER(email) = ''hidagafoor05@gmail.com''', col);
+        END IF;
+      END IF;
+    END LOOP;
 
     RAISE NOTICE 'Preserved Platform Super Admin status';
   END IF;
