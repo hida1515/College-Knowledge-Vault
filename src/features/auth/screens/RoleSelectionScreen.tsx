@@ -35,7 +35,6 @@ import {
   submitCollegeAdminRequest,
   getColleges,
   searchColleges,
-  createCollege,
 } from '../../../core/services/collegeService';
 import {
   validateInviteCode,
@@ -300,7 +299,11 @@ const RoleSelectionScreen: React.FC = () => {
       setIsSubmitting(true);
       setError(null);
 
-      const targetCollegeId = selectedCollege?.id || null;
+      // If the college is custom/unlisted (id starts with 'custom-'), targetCollegeId must be null
+      // so PostgreSQL accepts it and Super Admin can review/create it upon request approval.
+      const rawCollegeId = selectedCollege?.id || null;
+      const isCustomId = !rawCollegeId || rawCollegeId.startsWith('custom-');
+      const targetCollegeId = isCustomId ? null : rawCollegeId;
       const cleanCode = inviteCode.trim().toUpperCase() || user.joinedViaCode || null;
 
       // 1. FACULTY CONTEXT SUBMISSION
@@ -345,22 +348,6 @@ const RoleSelectionScreen: React.FC = () => {
 
       // 2. COLLEGE ADMIN CONTEXT SUBMISSION
       if (isCollegeAdminFlow) {
-        let targetCollegeId = selectedCollege?.id || null;
-
-        if (isCustomCollege && customCollegeName.trim() && (!targetCollegeId || targetCollegeId.startsWith('custom-'))) {
-          try {
-            const created = await createCollege({
-              name: customCollegeName.trim(),
-              city: customCity.trim() || 'City',
-              state: customState.trim() || 'State',
-              createdBy: user.id,
-            });
-            targetCollegeId = created.id;
-          } catch {
-            // fallback
-          }
-        }
-
         const updatedUser = await completeRoleSelection(user.id, {
           role: UserRole.Student,
           college: finalCollegeName,

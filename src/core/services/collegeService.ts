@@ -163,11 +163,14 @@ export async function submitCollegeAdminRequest(params: {
     reason,
   } = params;
 
+  const isCustomId = typeof collegeId === 'string' && collegeId.startsWith('custom-');
+  const safeCollegeId = isCustomId || !collegeId ? null : collegeId;
+
   const { error: reqError } = await supabase
     .from('college_admin_requests')
     .insert({
       user_id: userId,
-      college_id: collegeId ?? null,
+      college_id: safeCollegeId,
       college_name: (collegeName || '').trim(),
       college_city: (collegeCity || '').trim(),
       college_state: (collegeState || '').trim(),

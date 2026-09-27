@@ -330,6 +330,10 @@ export async function completeRoleSelection(
     currentUser?.avatarUrl ||
     null;
 
+  const isCustomId =
+    typeof payload.collegeId === 'string' && payload.collegeId.startsWith('custom-');
+  const safeCollegeId = isCustomId || !payload.collegeId ? null : payload.collegeId;
+
   // Try updating with full program and invite code fields
   const updateFields: Record<string, any> = {
     email,
@@ -337,7 +341,7 @@ export async function completeRoleSelection(
     avatar_url: avatarUrl,
     role: payload.role,
     college: payload.college,
-    college_id: payload.collegeId ?? null,
+    college_id: safeCollegeId,
     department: payload.department,
     joining_year: payload.joiningYear ?? null,
     program: payload.program ?? null,
@@ -372,7 +376,7 @@ export async function completeRoleSelection(
         avatar_url: avatarUrl,
         role: payload.role,
         college: payload.college,
-        college_id: payload.collegeId ?? null,
+        college_id: safeCollegeId,
         department: payload.department,
         joining_year: payload.joiningYear ?? null,
         program: payload.program ?? null,
